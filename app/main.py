@@ -3,16 +3,29 @@ import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import redis.asyncio as aioredis
 
-app = FastAPI(title="Plataforma de Leilões em Tempo Real - DETI")
+# --- NOVOS IMPORTS PARA A BASE DE DADOS ---
+from .database import engine, Base
+from . import models  # Obriga o Python a ler o ficheiro models.py
+
+app = FastAPI(title="Plataforma de Leilões em Tempo Real")
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_client = None
 
+# O evento "startup" corre ANTES de o servidor começar a receber utilizadores
 @app.on_event("startup")
 async def startup_event():
     global redis_client
-    # Inicializa o cliente Redis assíncrono
+    
+    # 1. Inicializa o cliente Redis assíncrono
     redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
+    
+    # 2. A MAGIA DA BASE DE DADOS:
+    # Este comando diz ao motor (engine) para ir ao PostgreSQL e criar fisicamente 
+    # todas as tabelas que herdam de 'Base' (as tabelas do models.py) se elas ainda não existirem.
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("🚀 Tabelas da Base de Dados criadas/verificadas com sucesso!")
 
 @app.get("/")
 async def read_root():
@@ -26,11 +39,9 @@ async def read_root():
 async def websocket_endpoint(websocket: WebSocket, leilao_id: str):
     await websocket.accept()
     
-    # Criar um cliente pubsub dedicado para esta conexão WebSocket
     pubsub = redis_client.pubsub()
     await pubsub.subscribe(f"leilao:{leilao_id}")
     
-    # Tarefa em segundo plano para escutar mensagens do Redis e enviar ao cliente
     async def redis_listener():
         try:
             while True:
@@ -45,15 +56,10 @@ async def websocket_endpoint(websocket: WebSocket, leilao_id: str):
 
     try:
         while True:
-            # Escuta novas licitações vindas DESTE cliente WebSocket específico
             data = await websocket.receive_text()
-            
-            # [Lógica Futura]: Validar transação atómica aqui usando o Redis.
-            # Se for válida, fazemos Publish para avisar TODOS os clientes na sala:
             await redis_client.publish(f"leilao:{leilao_id}", f"Nova licitação recebida: {data}")
             
     except WebSocketDisconnect:
-        # Limpeza quando o utilizador fecha a página ou cai a net
         listener_task.cancel()
         await pubsub.unsubscribe(f"leilao:{leilao_id}")
         await websocket.close()
