@@ -7,9 +7,7 @@ class Utilizador(Base):
     __tablename__ = "utilizadores"
 
     id = Column(Integer, primary_key=True, index=True)
-    nome = Column(String, nullable=False)
-    email = Column(String, unique=True, index=True, nullable=False)
-    password = Column(String, nullable=False) # Mais tarde teremos de encriptar isto!
+    nome = Column(String, unique=True, index=True, nullbase=False )
 
 # 2. Tabela de Leilões
 class Leilao(Base):

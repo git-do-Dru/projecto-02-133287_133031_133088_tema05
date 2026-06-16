@@ -2,8 +2,12 @@ import os
 import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import redis.asyncio as aioredis
+from fastapi import Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from . import schemas
+from .database import get_db
 
-# --- NOVOS IMPORTS PARA A BASE DE DADOS ---
 from .database import engine, Base
 from . import models  # Obriga o Python a ler o ficheiro models.py
 
@@ -28,6 +32,27 @@ async def startup_event():
     print("🚀 Tabelas da Base de Dados criadas/verificadas com sucesso!")
 
 @app.get("/")
+
+# Metodo que faz a criacao de user (contem apenas o nickname)
+@app.post("/entrar", response_model=schemas.UtilizadorResponse)
+async def entrar_na_plataforma(utilizador: schemas.UtilizadorCreate, db: AsyncSession = Depends(get_db)):
+    
+    # 1. Vai à base de dados procurar se este Nick já existe
+    result = await db.execute(select(models.Utilizador).where(models.Utilizador.nome == utilizador.nome))
+    db_user = result.scalars().first()
+    
+    # 2. Se já existir, devolvemos esse utilizador (Login com sucesso)
+    if db_user:
+        return db_user
+        
+    # 3. Se não existir, criamos um novo!
+    novo_utilizador = models.Utilizador(nome=utilizador.nome)
+    db.add(novo_utilizador)
+    await db.commit() # Guarda na base de dados
+    await db.refresh(novo_utilizador) # Atualiza a variável para descobrirmos que "id" lhe foi dado
+    
+    return novo_utilizador
+
 async def read_root():
     return {
         "status": "API REST Ativa",
