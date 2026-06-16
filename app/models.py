@@ -7,9 +7,9 @@ class Utilizador(Base):
     __tablename__ = "utilizadores"
 
     id = Column(Integer, primary_key=True, index=True)
-    nome = Column(String, unique=True, index=True, nullbase=False )
+    nome = Column(String, unique=True, index=True, nullable=False )
 
-# 2. Tabela de Leilões
+# 2. Tabela de Leiloes
 class Leilao(Base):
     __tablename__ = "leiloes"
 
@@ -24,3 +24,15 @@ class Leilao(Base):
     
     # Chave Estrangeira: Diz-nos qual foi o utilizador (id) que criou este leilão
     dono_id = Column(Integer, ForeignKey("utilizadores.id"))
+
+#3. Tabela de Licitacoes
+class Licitacao(Base):
+    __tablename__ = "licitacoes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    valor = Column(Float, nullable=False)
+    criado_em = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Chaves Estrangeiras: Quem fez o lance e em que leilão?
+    leilao_id = Column(Integer, ForeignKey("leiloes.id"))
+    utilizador_id = Column(Integer, ForeignKey("utilizadores.id"))

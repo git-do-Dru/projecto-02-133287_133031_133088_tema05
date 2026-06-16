@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from . import schemas
 from .database import get_db
+from .database import engine, Base, get_db, AsyncSessionLocal
 
 from .database import engine, Base
 from . import models  # Obriga o Python a ler o ficheiro models.py
@@ -20,16 +21,41 @@ redis_client = None
 @app.on_event("startup")
 async def startup_event():
     global redis_client
-    
-    # 1. Inicializa o cliente Redis assíncrono
     redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
-    
-    # 2. A MAGIA DA BASE DE DADOS:
-    # Este comando diz ao motor (engine) para ir ao PostgreSQL e criar fisicamente 
-    # todas as tabelas que herdam de 'Base' (as tabelas do models.py) se elas ainda não existirem.
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("🚀 Tabelas da Base de Dados criadas/verificadas com sucesso!")
+
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(models.Leilao))
+        leiloes_existentes = result.scalars().first()
+        
+        if not leiloes_existentes:
+            # 1. Criar dois utilizadores diferentes
+            vendedor = models.Utilizador(nome="Admin")
+            comprador = models.Utilizador(nome="Geraldo_Alberto")
+            db.add_all([vendedor, comprador])
+            await db.commit()
+            await db.refresh(vendedor)
+            await db.refresh(comprador)
+            
+            # 2. Criar os leilões 
+            l1 = models.Leilao(titulo="Rolex Submariner", descricao="Relógio de luxo", preco_inicial=5000.0, preco_atual=5500.0, dono_id=vendedor.id)
+            l2 = models.Leilao(titulo="PlayStation 5", descricao="Nova na caixa", preco_inicial=400.0, preco_atual=460.0, dono_id=vendedor.id)
+            l3 = models.Leilao(titulo="Bicicleta de Montanha Santa Cruz", descricao="Cor preta com dupla suspensao da Fox", preco_inicial=100.0, preco_atual=100.0, dono_id=vendedor.id) 
+            
+            db.add_all([l1, l2, l3])
+            await db.commit()
+            await db.refresh(l1)
+            await db.refresh(l2)
+            
+            # 3. Registar o histórico dos lances no sistema!
+            lance_rolex = models.Licitacao(valor=5500.0, leilao_id=l1.id, utilizador_id=comprador.id)
+            lance_ps5 = models.Licitacao(valor=460.0, leilao_id=l2.id, utilizador_id=comprador.id)
+            
+            db.add_all([lance_rolex, lance_ps5])
+            await db.commit()
 
 @app.get("/")
 
@@ -88,3 +114,30 @@ async def websocket_endpoint(websocket: WebSocket, leilao_id: str):
         listener_task.cancel()
         await pubsub.unsubscribe(f"leilao:{leilao_id}")
         await websocket.close()
+
+
+
+
+#--- ROTAS DO MENU DE LEILÕES ---
+
+@app.post("/leiloes", response_model=schemas.LeilaoResponse)
+async def anunciar_item(leilao: schemas.LeilaoCreate, dono_id: int, db: AsyncSession = Depends(get_db)):
+    """Rota para um utilizador criar um leilão novo"""
+    novo_leilao = models.Leilao(
+        titulo=leilao.titulo,
+        descricao=leilao.descricao,
+        preco_inicial=leilao.preco_inicial,
+        preco_atual=leilao.preco_inicial, 
+        dono_id=dono_id
+    )
+    db.add(novo_leilao)
+    await db.commit()
+    await db.refresh(novo_leilao)
+    return novo_leilao
+
+@app.get("/leiloes", response_model=list[schemas.LeilaoResponse])
+async def listar_montra(db: AsyncSession = Depends(get_db)):
+    """Rota para listar todos os leilões ativos na plataforma"""
+    result = await db.execute(select(models.Leilao))
+    lista_de_leiloes = result.scalars().all()
+    return lista_de_leiloes
