@@ -5,12 +5,22 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPExcept
 import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from fastapi.middleware.cors import CORSMiddleware
 
-# Importações do teu projeto
+# Importações do projeto
 from . import schemas, models, crud
 from .database import engine, Base, get_db, AsyncSessionLocal
 
 app = FastAPI(title="Plataforma de Leilões em Tempo Real")
+
+# --- PERMISSÕES CORS (Para o Frontend conseguir falar com a API) ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Permite que qualquer Frontend se ligue
+    allow_credentials=True,
+    allow_methods=["*"],  
+    allow_headers=["*"],
+)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_client = None
@@ -47,7 +57,7 @@ async def startup_event():
             await db.refresh(l1)
             await db.refresh(l2)
             
-            # 3. Registar o histórico dos lances no sistema!
+            # 3. Registar o histórico dos lances no sistema
             lance_rolex = models.Licitacao(valor=5500.0, leilao_id=l1.id, utilizador_id=comprador.id)
             lance_ps5 = models.Licitacao(valor=460.0, leilao_id=l2.id, utilizador_id=comprador.id)
             
@@ -113,7 +123,7 @@ async def listar_montra(db: AsyncSession = Depends(get_db)):
 async def websocket_endpoint(websocket: WebSocket, leilao_id: int):
     await websocket.accept()
     
-    # 1. Prepara a ligação ao canal VIP deste leilão específico no Redis
+    # 1. Prepara a ligação ao canal deste leilão específico no Redis
     pubsub = redis_client.pubsub()
     await pubsub.subscribe(f"leilao:{leilao_id}")
     
