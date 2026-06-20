@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Plataforma de Leilões</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 90vh; margin: 0; }
+        
+        .caixa-principal { width: 100%; max-width: 600px; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); position: relative; }
+        
+        /* Estilos da Tela de Entrada */
+        #tela-entrada { text-align: center; }
+        .input-lobby { width: 80%; padding: 12px; margin: 10px 0 20px 0; font-size: 16px; border: 2px solid #ddd; border-radius: 6px; }
+        .btn-entrar { background-color: #0275d8; color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.3s; width: 85%; }
+        .btn-entrar:hover { background-color: #025aa5; }
+
+        /* Estilos da Tela de Leilão */
+        .contador-pessoas { position: absolute; top: -15px; right: -15px; background-color: #333; color: white; padding: 10px 15px; border-radius: 20px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        #chat { height: 350px; overflow-y: auto; border: 1px solid #ccc; padding: 15px; background: #fafafa; margin-bottom: 20px; border-radius: 6px; }
+        ul { list-style-type: none; padding: 0; margin: 0; }
+        li { padding: 8px; border-bottom: 1px solid #eee; font-size: 16px; }
+        .painel-valor { background-color: #ffeaea; border: 2px solid #d9534f; border-radius: 6px; padding: 15px; text-align: center; margin-bottom: 20px; transition: 0.5s; }
+        .painel-valor h2 { margin: 5px 0; color: #d9534f; font-size: 32px; }
+        
+        .area-controlos { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #f9f9f9; padding: 15px; border-radius: 6px; border: 1px solid #ddd; }
+        input[type="number"] { padding: 10px; font-size: 18px; border: 1px solid #ccc; border-radius: 4px; width: 100px; text-align: center; }
+        .btn-licitar { background-color: #5cb85c; color: white; border: none; padding: 12px 15px; cursor: pointer; border-radius: 6px; font-weight: bold; font-size: 18px; flex-grow: 1; }
+        .btn-licitar:hover { background-color: #4cae4c; }
+        .btn-licitar:disabled { background-color: #cccccc; cursor: not-allowed; }
+        .btn-sair { background-color: #d9534f; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 6px; font-weight: bold; float: right; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="tela-entrada" class="caixa-principal">
+        <h1 style="color: #333;">🏛️ Casa de Leilões</h1>
+        <p>Identifica-te e escolhe a sala em que queres entrar.</p>
+        
+        <h4 style="margin-bottom: 5px; text-align: left; margin-left: 10%;">1. O teu Nome:</h4>
+        <input type="text" id="input_nome" class="input-lobby" placeholder="Ex: Maria João">
+        
+        <h4 style="margin-bottom: 5px; text-align: left; margin-left: 10%;">2. Qual Leilão?</h4>
+        <select id="escolha_leilao" class="input-lobby">
+            <option value="1">⌚ 1 - Rolex Submariner (Inicia a 5500€)</option>
+            <option value="2">🎮 2 - PlayStation 5 (Inicia a 400€)</option>
+            <option value="3">🚴 3 - Bicicleta de Montanha (Inicia a 100€)</option>
+        </select>
+        
+        <button class="btn-entrar" onclick="entrarNaSala()">Entrar no Leilão ➔</button>
+    </div>
+
+
+    <div id="tela-leilao" class="caixa-principal" style="display: none;">
+        <div class="contador-pessoas" id="contador">👥 0 na sala</div>
+        <button id="btn-sair" class="btn-sair" onclick="sairLeilao()">🚪 Sair da Sala</button>
+        
+        <h2 id="titulo-leilao" style="margin-top: 0;">Leilão</h2>
+        
+        <div class="painel-valor" id="painel-destaque">
+            <p id="texto-painel" style="margin:0; font-weight:bold;">Lance Mais Alto Atual:</p>
+            <h2 id="valor-atual">0.0€</h2>
+            <p id="vencedor-atual" style="margin:5px 0 0 0; color: #555; font-size: 14px;">(A aguardar lances...)</p>
+        </div>
+        
+        <div id="chat">
+            <ul id="historico"></ul>
+        </div>
+
+        <div class="area-controlos">
+            <span style="font-weight: bold; font-size: 18px;">Cobrir com: +</span>
+            <input type="number" id="valor_aumento" value="50" min="1" step="10">
+            <span style="font-weight: bold; font-size: 18px;">€</span>
+            <button id="btn-licitar" class="btn-licitar" onclick="fazerLance()">💸 Lançar Oferta!</button>
+        </div>
+    </div>
+
+    <script>
+        let ws; // Variável global para guardar a ligação
+        let meu_nome = "";
+        let lance_mais_alto = 0.0;
+        let utilizadores_ativos = new Set();
+        let nome_do_vencedor = "Ninguém";
+
+        // Preços base de acordo com a tua Base de Dados no main.py
+        const precos_base = { "1": 5500.0, "2": 400.0, "3": 100.0 };
+        const titulos = { "1": "⌚ Rolex Submariner", "2": "🎮 PlayStation 5", "3": "🚴 Bicicleta de Montanha" };
+
+        function entrarNaSala() {
+            // 1. Validar Nome
+            meu_nome = document.getElementById("input_nome").value.trim();
+            if (meu_nome === "") {
+                alert("Por favor, escreve o teu nome antes de entrar!");
+                return;
+            }
+
+            // 2. Recolher dados do leilão
+            const leilao_id = document.getElementById("escolha_leilao").value;
+            lance_mais_alto = precos_base[leilao_id];
+
+            // 3. Esconder Lobby e Mostrar Sala
+            document.getElementById("tela-entrada").style.display = "none";
+            document.getElementById("tela-leilao").style.display = "block";
+            
+            // 4. Configurar a Interface para este leilão
+            document.getElementById("titulo-leilao").innerText = titulos[leilao_id];
+            document.getElementById("valor-atual").innerText = lance_mais_alto + "€";
+            document.getElementById("historico").innerHTML = ""; // Limpa chat se o user reentrar
+            utilizadores_ativos.clear();
+            
+            // 5. Ligar aos WebSockets específicos desta sala!
+            ws = new WebSocket(`ws://localhost:8000/ws/leilao/${leilao_id}`);
+
+            ws.onopen = function() {
+                ws.send(`ENTROU: ${meu_nome}`);
+            };
+
+            ws.onmessage = function(event) {
+                processarMensagemServidor(event.data);
+            };
+        }
+
+        function processarMensagemServidor(dados) {
+            let texto = dados.replace("Broadcast: Nova licitação recebida: ", "");
+            
+            if (texto.startsWith("ENTROU: ")) {
+                let nome = texto.split("ENTROU: ")[1].trim();
+                utilizadores_ativos.add(nome);
+                atualizarContador();
+                adicionarAoChat(`<span style="color: gray;">👋 <b>${nome}</b> juntou-se ao leilão.</span>`);
+            }
+            else if (texto.startsWith("SAIU: ")) {
+                let nome = texto.split("SAIU: ")[1].trim();
+                utilizadores_ativos.delete(nome);
+                atualizarContador();
+                adicionarAoChat(`<span style="color: orange;">🚪 <b>${nome}</b> saiu da sala.</span>`);
+                
+                if (utilizadores_ativos.size <= 1 && lance_mais_alto > precos_base[document.getElementById("escolha_leilao").value]) {
+                    declararVencedorFinal();
+                }
+            }
+            else {
+                const detetar_numero = texto.match(/(\d+(?:\.\d+)?)€/);
+                if (detetar_numero) {
+                    const valor_recebido = parseFloat(detetar_numero[1]);
+                    nome_do_vencedor = texto.split(" ")[0]; 
+                    
+                    // 🌟 CORREÇÃO AQUI: Se a pessoa fizer um lance, garantimos que ela é contada na sala!
+                    if (!utilizadores_ativos.has(nome_do_vencedor)) {
+                        utilizadores_ativos.add(nome_do_vencedor);
+                        atualizarContador();
+                    }
+                    
+                    if (valor_recebido > lance_mais_alto) {
+                        lance_mais_alto = valor_recebido;
+                        document.getElementById('valor-atual').innerText = lance_mais_alto + '€';
+                        document.getElementById('vencedor-atual').innerText = `Líder: ${nome_do_vencedor}`;
+                    }
+                }
+                adicionarAoChat(`<span style="color: #d9534f; font-weight: bold;">⚡ Lance:</span> ${texto}`);
+            }
+        }
+
+        function fazerLance() {
+            const aumento = parseFloat(document.getElementById("valor_aumento").value);
+            if (isNaN(aumento) || aumento <= 0) return alert("Valor inválido!");
+
+            const btn = document.getElementById("btn-licitar");
+            btn.disabled = true;
+            btn.innerText = "Aguarde...";
+
+            lance_mais_alto += aumento;
+            document.getElementById('valor-atual').innerText = lance_mais_alto + '€'; 
+            document.getElementById('vencedor-atual').innerText = `Líder: ${meu_nome}`;
+            
+            ws.send(`${meu_nome} cobriu a oferta com ${lance_mais_alto}€`);
+
+            setTimeout(() => { btn.disabled = false; btn.innerText = "💸 Lançar Oferta!"; }, 2000);
+        }
+
+        function sairLeilao() {
+            ws.send(`SAIU: ${meu_nome}`);
+            ws.close();
+            
+            // Volta para o Lobby
+            document.getElementById("tela-leilao").style.display = "none";
+            document.getElementById("tela-entrada").style.display = "block";
+            
+            // Restaura o painel caso o utilizador tenha ganho e queira entrar noutro leilão
+            const painel = document.getElementById("painel-destaque");
+            painel.style.backgroundColor = "#ffeaea";
+            painel.style.borderColor = "#d9534f";
+            document.getElementById("texto-painel").innerText = "Lance Mais Alto Atual:";
+            document.getElementById("texto-painel").style.color = "black";
+            document.getElementById("valor-atual").style.color = "#d9534f";
+            document.getElementById("btn-licitar").disabled = false;
+        }
+
+        function atualizarContador() { document.getElementById("contador").innerText = `👥 ${utilizadores_ativos.size} na sala`; }
+        
+        function adicionarAoChat(html) {
+            const historico = document.getElementById('historico');
+            const item = document.createElement('li');
+            item.innerHTML = html;
+            historico.appendChild(item);
+            const chat = document.getElementById('chat');
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function declararVencedorFinal() {
+            const painel = document.getElementById("painel-destaque");
+            painel.style.backgroundColor = "#fff3cd";
+            painel.style.borderColor = "#ffc107";
+            document.getElementById("texto-painel").innerText = "🎉 LEILÃO TERMINADO! VENDIDO A:";
+            document.getElementById("texto-painel").style.color = "#856404";
+            document.getElementById("valor-atual").style.color = "#856404";
+            document.getElementById("vencedor-atual").innerText = `🏆 ${nome_do_vencedor} venceu!`;
+            document.getElementById("vencedor-atual").style.color = "#856404";
+            document.getElementById("btn-licitar").disabled = true;
+        }
+    </script>
+</body>
+</html>

@@ -57,8 +57,6 @@ async def startup_event():
             db.add_all([lance_rolex, lance_ps5])
             await db.commit()
 
-@app.get("/")
-
 # Metodo que faz a criacao de user (contem apenas o nickname)
 @app.post("/entrar", response_model=schemas.UtilizadorResponse)
 async def entrar_na_plataforma(utilizador: schemas.UtilizadorCreate, db: AsyncSession = Depends(get_db)):
@@ -79,6 +77,8 @@ async def entrar_na_plataforma(utilizador: schemas.UtilizadorCreate, db: AsyncSe
     
     return novo_utilizador
 
+# <<< COLOCA O DECORADOR AQUI! >>>
+@app.get("/")
 async def read_root():
     return {
         "status": "API REST Ativa",
