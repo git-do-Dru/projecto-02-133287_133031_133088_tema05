@@ -1,6 +1,6 @@
-from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
+from pydantic import BaseModel
 
 
 class UtilizadorCreate(BaseModel):
@@ -11,6 +11,7 @@ class UtilizadorCreate(BaseModel):
 class UtilizadorResponse(BaseModel):
     id: int
     nome: str
+    carteira: float
 
     class Config:
         from_attributes = True
@@ -31,11 +32,17 @@ class LeilaoResponse(BaseModel):
     descricao: Optional[str] = None
     preco_inicial: float
     preco_atual: float
+    dono_id: int
     categoria: Optional[str] = None
     localizacao: Optional[str] = None
     emoji: Optional[str] = None
-    dono_id: int
     criado_em: datetime
 
     class Config:
         from_attributes = True
+
+
+class LanceCreate(BaseModel):
+    valor: float
+    utilizador_id: Optional[int] = None
+    nome: Optional[str] = None
