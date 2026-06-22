@@ -1,30 +1,31 @@
-from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
+from pydantic import BaseModel
 
-# 1. O que o user nos envia
+
 class UtilizadorCreate(BaseModel):
     nome: str
+    password: str
 
-# 2. O que nós DEVOLVEMOS ao utilizador
-# (Devolvemos o Nick e o ID que o PostgreSQL lhe atribuiu)
+
 class UtilizadorResponse(BaseModel):
     id: int
     nome: str
+    carteira: float
 
-    # Esta configuração é obrigatória para o Pydantic conseguir ler os dados do SQLAlchemy (Base de Dados)
     class Config:
         from_attributes = True
 
-# --- LEILÕES (O QUE ADICIONÁMOS AGORA) ---
 
-# 1. O que o utilizador ENVIA para anunciar um item
 class LeilaoCreate(BaseModel):
     titulo: str
-    descricao: Optional[str] = None  # Optional significa que o utilizador pode deixar a descrição em branco
+    descricao: Optional[str] = None
     preco_inicial: float
+    categoria: Optional[str] = None
+    localizacao: Optional[str] = None
+    emoji: Optional[str] = None
 
-# 2. O que nós DEVOLVEMOS para mostrar na montra do "OLX"
+
 class LeilaoResponse(BaseModel):
     id: int
     titulo: str
@@ -32,7 +33,16 @@ class LeilaoResponse(BaseModel):
     preco_inicial: float
     preco_atual: float
     dono_id: int
+    categoria: Optional[str] = None
+    localizacao: Optional[str] = None
+    emoji: Optional[str] = None
     criado_em: datetime
 
     class Config:
         from_attributes = True
+
+
+class LanceCreate(BaseModel):
+    valor: float
+    utilizador_id: Optional[int] = None
+    nome: Optional[str] = None

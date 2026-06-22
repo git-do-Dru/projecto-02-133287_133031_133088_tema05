@@ -2,32 +2,68 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from . import models
 
+
 async def registar_lance(db: AsyncSession, leilao_id: int, utilizador_id: int, valor_lance: float):
-    
-    # 1. Procurar o leilão na base de dados
-    result = await db.execute(select(models.Leilao).where(models.Leilao.id == leilao_id))
-    leilao = result.scalars().first()
+    result_leilao = await db.execute(
+        select(models.Leilao).where(models.Leilao.id == leilao_id)
+    )
+    leilao = result_leilao.scalars().first()
 
     if not leilao:
-        return {"sucesso": False, "mensagem": "Leilão não encontrado."}
+        return {
+            "sucesso": False,
+            "mensagem": "Leilão não encontrado."
+        }
 
-    # 2. A Regra de Ouro: Validar se o lance é válido (maior que o preço atual)
+    result_user = await db.execute(
+        select(models.Utilizador).where(models.Utilizador.id == utilizador_id)
+    )
+    utilizador = result_user.scalars().first()
+
+    if not utilizador:
+        return {
+            "sucesso": False,
+            "mensagem": "Utilizador não encontrado."
+        }
+
     if valor_lance <= leilao.preco_atual:
-        return {"sucesso": False, "mensagem": f"Lance inválido. O valor tem de ser maior que {leilao.preco_atual}€."}
+        return {
+            "sucesso": False,
+            "mensagem": f"Lance inválido. O valor tem de ser maior que {leilao.preco_atual}€."
+        }
 
-    # 3. Atualizar o preço do leilão
+    aumento = valor_lance - leilao.preco_atual
+
+    if utilizador.carteira is None:
+        utilizador.carteira = 10000.0
+
+    if aumento > utilizador.carteira:
+        return {
+            "sucesso": False,
+            "mensagem": f"Saldo insuficiente. Tens {utilizador.carteira:.0f}€ na carteira e precisas de {aumento:.0f}€ para este aumento."
+        }
+
+    utilizador.carteira -= aumento
     leilao.preco_atual = valor_lance
 
-    # 4. Criar o registo (recibo) na tabela de licitações
     nova_licitacao = models.Licitacao(
         valor=valor_lance,
         leilao_id=leilao_id,
         utilizador_id=utilizador_id
     )
+
     db.add(nova_licitacao)
 
-    # 5. Guardar TUDO no PostgreSQL
     await db.commit()
     await db.refresh(leilao)
+    await db.refresh(utilizador)
+    await db.refresh(nova_licitacao)
 
-    return {"sucesso": True, "novo_preco": leilao.preco_atual}
+    return {
+        "sucesso": True,
+        "novo_preco": leilao.preco_atual,
+        "carteira": utilizador.carteira,
+        "aumento": aumento,
+        "licitacao_id": nova_licitacao.id,
+        "criado_em": nova_licitacao.criado_em
+    }

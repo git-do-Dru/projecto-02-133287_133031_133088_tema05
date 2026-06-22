@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leilões Online</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+    <header>
+        <h1>Leilões Online</h1>
+
+        <div class="header-right">
+            <span class="header-user" id="topUser">Não autenticado</span>
+
+            <button id="btnVoltarHeader" class="btn-outline btn-small hidden" onclick="voltarAoUtilizadorAnterior()">
+                Voltar atrás
+            </button>
+
+            <button id="btnTrocarUser" class="btn-outline btn-small hidden" onclick="trocarUtilizador()">
+                Trocar utilizador
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <section id="pageLogin" class="login-page">
+            <div class="card login-card">
+                <h2>Entra na plataforma</h2>
+                <p>Cria ou entra com um nome de utilizador e uma palavra-passe.</p>
+
+                <label for="inputNome" style="text-align:left;">Nome de utilizador</label>
+                <input id="inputNome" type="text" placeholder="Ex: Atuzi">
+
+                <div class="password-wrapper">
+                    <label for="inputPassword" style="text-align:left;">Palavra-passe</label>
+
+                    <div class="input-with-eye">
+                        <input id="inputPassword" type="password" placeholder="Escolhe ou escreve a tua palavra-passe">
+                        <button type="button" class="eye-btn" onclick="togglePassword('inputPassword', this)">👁️</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="inputPasswordConfirm" style="text-align:left;">Confirmar palavra-passe</label>
+                    <input id="inputPasswordConfirm" type="password" placeholder="Repete a palavra-passe se estiveres a criar conta">
+                </div>
+
+                <button class="btn-olx" style="width:100%;" onclick="entrarPlataforma()">
+                    Entrar / Criar conta
+                </button>
+
+                <div class="status" id="loginStatus"></div>
+            </div>
+        </section>
+
+        <section id="pageMarket" class="container hidden">
+            <div class="market-top">
+                <div>
+                    <h2>Leilões disponíveis</h2>
+                    <p>Escolhe um leilão ativo ou cria o teu próprio anúncio.</p>
+                </div>
+
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <button class="btn-danger" onclick="reiniciarSiteLeiloes()">
+                        Reiniciar site / leilões
+                    </button>
+
+                    <button class="btn-olx" onclick="abrirCriarLeilao()">
+                        + Criar o meu leilão
+                    </button>
+                </div>
+            </div>
+
+            <div class="hero-banner">
+                <div>
+                    <h3>Compra e vende em leilões ao vivo</h3>
+                    <p>Entra numa sala, compete com outros utilizadores e acompanha os lances em tempo real.</p>
+                </div>
+
+                <div class="hero-stats">
+                    <div class="hero-stat">
+                        <strong id="totalLeiloes">0</strong>
+                        leilões
+                    </div>
+
+                    <div class="hero-stat">
+                        <strong>Live</strong>
+                        WebSockets
+                    </div>
+
+                    <div class="hero-stat">
+                        <strong id="botsStatusHero">OFF</strong>
+                        bots
+                    </div>
+                </div>
+            </div>
+
+            <div id="botWarning" class="card hidden" style="padding:18px; margin-bottom:22px; border-left:6px solid #e74c3c;">
+                <strong>Bots desligados.</strong>
+                Para poderes entrar e licitar, abre outro terminal e executa:
+                <br>
+                <code>docker compose exec api python app/bots.py</code>
+            </div>
+
+            <div id="auctionGrid" class="auction-grid"></div>
+        </section>
+
+        <section id="pageCreate" class="container hidden">
+            <div class="card form-card">
+                <h2>Criar novo leilão</h2>
+                <p>Preenche os dados do item que queres colocar na plataforma.</p>
+
+                <label for="inputTitulo">Título do item</label>
+                <input id="inputTitulo" type="text" placeholder="Ex: iPhone 15 Pro">
+
+                <label for="inputDescricao">Descrição</label>
+                <textarea id="inputDescricao" rows="4" placeholder="Descreve o estado do produto, detalhes, acessórios incluídos, etc."></textarea>
+
+                <div class="form-grid">
+                    <div>
+                        <label for="inputPreco">Preço inicial (€)</label>
+                        <input id="inputPreco" type="number" min="1" step="1" placeholder="Ex: 300">
+                    </div>
+
+                    <div>
+                        <label for="inputCategoria">Categoria</label>
+                        <input id="inputCategoria" type="text" placeholder="Ex: Tecnologia">
+                    </div>
+
+                    <div>
+                        <label for="inputLocalizacao">Localização</label>
+                        <input id="inputLocalizacao" type="text" placeholder="Ex: Aveiro">
+                    </div>
+
+                    <div>
+                        <label for="inputEmoji">Emoji / Ícone</label>
+                        <select id="inputEmoji">
+                            <option value="📦">📦 Geral</option>
+                            <option value="💻">💻 Portátil / Computador</option>
+                            <option value="📱">📱 Telemóvel</option>
+                            <option value="🎮">🎮 Gaming</option>
+                            <option value="🚗">🚗 Carro</option>
+                            <option value="📺">📺 Televisão</option>
+                            <option value="🎸">🎸 Guitarra / Música</option>
+                            <option value="⌚">⌚ Relógio / Luxo</option>
+                            <option value="🚲">🚲 Bicicleta</option>
+                            <option value="👟">👟 Roupa / Calçado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn-primary" onclick="criarLeilao()">Publicar leilão</button>
+                    <button class="btn-outline" onclick="mostrarMontra()">Cancelar</button>
+                </div>
+
+                <div class="status" id="createStatus"></div>
+            </div>
+        </section>
+
+        <section id="pageRoom" class="container hidden">
+            <div class="room-layout">
+                <div class="card room-main">
+                    <div class="room-header">
+                        <div>
+                            <h2 id="roomTitle">Leilão</h2>
+                            <p>Leilão em direto com atualizações em tempo real.</p>
+                        </div>
+
+                        <div class="room-actions">
+                            <span class="people-pill" id="contadorPessoas">
+                                <span class="live-dot"></span>
+                                👥 0 na sala
+                            </span>
+                            <button class="btn-danger" onclick="sairLeilao()">Sair</button>
+                        </div>
+                    </div>
+
+                    <div class="room-info-line">
+                        <span id="roomCategoria">Categoria: Geral</span>
+                        <span id="roomLocalizacao">Localização: Portugal</span>
+                        <span id="roomPrecoInicial">Preço inicial: 0€</span>
+                        <span id="roomWallet">Carteira: 10000€</span>
+                    </div>
+
+                    <div class="price-box" id="painelPreco">
+                        <p id="textoPainel">Lance mais alto atual</p>
+                        <h3 id="valorAtual">0€</h3>
+                        <p id="vencedorAtual">A aguardar lances.</p>
+                    </div>
+
+                    <h3>Histórico do leilão</h3>
+                    <div class="chat-box" id="chatBox"></div>
+                </div>
+
+                <div class="card room-side">
+                    <h3>Fazer uma oferta</h3>
+                    <p>Cobre o valor atual para tentares ficar em primeiro lugar.</p>
+
+                    <label for="inputAumento">Aumentar por (€)</label>
+                    <input id="inputAumento" type="number" min="1" step="10" value="50">
+
+                    <button id="btnLancarOferta" class="btn-olx bid-submit" style="width:100%;" onclick="fazerLance()">
+                        Lançar oferta
+                    </button>
+
+                    <div class="quick-buttons">
+                        <button class="btn-outline quick-bid" onclick="preencherAumento(10)">+10€</button>
+                        <button class="btn-outline quick-bid" onclick="preencherAumento(50)">+50€</button>
+                        <button class="btn-outline quick-bid" onclick="preencherAumento(100)">+100€</button>
+                    </div>
+
+                    <hr style="width:100%; border:0; border-top:1px solid #d8e0e0; margin:24px 0;">
+
+                    <button class="btn-outline" style="width:100%;" onclick="mostrarMontra()">
+                        Voltar à montra
+                    </button>
+
+                    <div class="status" id="bidStatus"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/script.js"></script>
+</body>
+</html>
